@@ -1,0 +1,90 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require("../app"),
+  cluster = require("cluster"),
+  net = require("net"),
+  sio = require("socket.io"),
+  sio_redis = require("socket.io-redis"),
+  farmhash = require("farmhash"),
+  port = 3001,
+  num_processes = require("os").cpus().length;
+global.sockets = [];
+const socketsModel = require("../sockets.model");
+
+console.log(`CPU Cores: ${num_processes}`);
+
+const setupMaster = async () => {
+  await socketsModel.deleteMany({});
+  let sockets = await socketsModel.find({});
+  console.log(
+    "Connected Sockets for First Time Cleared ------------------->",
+    sockets
+  );
+  var workers = [];
+
+  // Helper function for spawning worker at index 'i'.
+  var spawn = function(i) {
+    workers[i] = cluster.fork();
+
+    // Optional: Restart worker on exit
+    workers[i].on("exit", function(code, signal) {
+      console.log("respawning worker", i);
+      spawn(i);
+    });
+
+    workers[i].on('online', () => {
+      console.log("Worker is online ------------------>");
+      // Worker is online
+    });
+
+
+  };
+
+  // Spawn workers.
+  for (var i = 0; i < num_processes; i++) {
+    spawn(i);
+  }
+
+  var worker_index = function(ip, len) {
+    return farmhash.fingerprint32(ip) % len; // Farmhash is the fastest and works with IPv6, too
+  };
+
+  // Create the outside facing server listening on our port.
+  var server = net
+    .createServer({ pauseOnConnect: true }, function(connection) {
+      var worker =
+        workers[worker_index(connection.remoteAddress, num_processes)];
+      worker.send("sticky-session:connection", connection);
+    })
+    .listen(port);
+};
+
+const setupWorker = async () => {
+  var server = app.listen(0, "192.168.1.160"),
+    socket_handler = require("../socket-handler");
+  global.io = sio(server);
+
+  global.io.adapter(sio_redis({ host: "localhost", port: 6379 }));
+
+  // Here you might use Socket.IO middleware for authorization etc.
+  console.log("Process", process.pid);
+  // Listen to messages sent from the master. Ignore everything else.
+  process.on("message", function(message, connection) {
+    if (message !== "sticky-session:connection") {
+      return;
+    }
+    server.emit("connection", connection);
+    connection.resume();
+  });
+  socket_handler(global.io);
+};
+
+if (cluster.isMaster) {
+  setupMaster();
+} else {
+  setupWorker();
+}

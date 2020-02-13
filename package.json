@@ -1,0 +1,21 @@
+{
+  "name": "cluster-socket",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "nodemon ./bin/www",
+    "pm2": "pm2 start ./bin/www"
+  },
+  "dependencies": {
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.6.9",
+    "express": "~4.16.0",
+    "farmhash": "^3.0.0",
+    "http-errors": "~1.6.2",
+    "mongoose": "^5.8.11",
+    "morgan": "~1.9.0",
+    "net": "^1.0.2",
+    "socket.io": "^2.3.0",
+    "socket.io-redis": "^5.2.0"
+  }
+}
