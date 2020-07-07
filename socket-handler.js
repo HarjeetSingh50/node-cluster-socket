@@ -7,7 +7,7 @@ module.exports = io => {
     });
     let sockets = await socketsModel.find({});
     console.log("Connected Sockets", sockets);
-    
+
     socket.on("disconnect", async () => {
       console.log("user disconnected for socket " + socket.id);
       await socketsModel.deleteOne({ socket_id: socket.id });

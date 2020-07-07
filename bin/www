@@ -15,9 +15,9 @@ var app = require("../app"),
 global.sockets = [];
 const socketsModel = require("../sockets.model");
 
-console.log(`CPU Cores: ${num_processes}`);
-
 const setupMaster = async () => {
+  console.log(`CPU Cores: ${num_processes}`);
+
   await socketsModel.deleteMany({});
   let sockets = await socketsModel.find({});
   console.log(
@@ -27,21 +27,14 @@ const setupMaster = async () => {
   var workers = [];
 
   // Helper function for spawning worker at index 'i'.
-  var spawn = function(i) {
+  var spawn = function (i) {
     workers[i] = cluster.fork();
 
     // Optional: Restart worker on exit
-    workers[i].on("exit", function(code, signal) {
+    workers[i].on("exit", function (code, signal) {
       console.log("respawning worker", i);
       spawn(i);
     });
-
-    workers[i].on('online', () => {
-      console.log("Worker is online ------------------>");
-      // Worker is online
-    });
-
-
   };
 
   // Spawn workers.
@@ -49,13 +42,13 @@ const setupMaster = async () => {
     spawn(i);
   }
 
-  var worker_index = function(ip, len) {
+  var worker_index = function (ip, len) {
     return farmhash.fingerprint32(ip) % len; // Farmhash is the fastest and works with IPv6, too
   };
 
   // Create the outside facing server listening on our port.
   var server = net
-    .createServer({ pauseOnConnect: true }, function(connection) {
+    .createServer({ pauseOnConnect: true }, function (connection) {
       var worker =
         workers[worker_index(connection.remoteAddress, num_processes)];
       worker.send("sticky-session:connection", connection);
@@ -64,7 +57,7 @@ const setupMaster = async () => {
 };
 
 const setupWorker = async () => {
-  var server = app.listen(0, "192.168.1.160"),
+  var server = app.listen(0, "localhost"),
     socket_handler = require("../socket-handler");
   global.io = sio(server);
 
@@ -73,7 +66,7 @@ const setupWorker = async () => {
   // Here you might use Socket.IO middleware for authorization etc.
   console.log("Process", process.pid);
   // Listen to messages sent from the master. Ignore everything else.
-  process.on("message", function(message, connection) {
+  process.on("message", function (message, connection) {
     if (message !== "sticky-session:connection") {
       return;
     }
